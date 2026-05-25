@@ -1,0 +1,464 @@
+\documentclass[lettersize,journal]{IEEEtran}
+\usepackage{amsmath,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+% updated with editorial comments 8/9/2021
+
+\begin{document}
+
+\title{A PSO-based Beamforming Algorithm In Metasurface Antenna System}
+
+\author{Astoria Greengrass}
+
+% The paper headers
+\markboth{Journal of \LaTeX\ Class Files,~Vol.~14, No.~8, August~2021}%
+{Shell \MakeLowercase{\textit{et al.}}: A Sample Article Using IEEEtran.cls for IEEE Journals}
+
+\IEEEpubid{0000--0000/00\$00.00~\copyright~2021 IEEE}
+% Remember, if you use this you must call \IEEEpubidadjcol in the second
+% column for its text to clear the IEEEpubid mark.
+
+\maketitle
+
+\begin{abstract}
+  This paper presents an improved Particle Swarm Optimization (PSO) approach for beamforming and interference suppression in metasurface antenna systems without relying on channel state information. The proposed method enhances the standard PSO algorithm through three key modifications:hybrid population initialization using steering-vector and Discrete Fourier Transform (DFT) codebooks, dynamic adjustment of velocity update parameters, and a similarity-based particle reinitialization mechanism.Simulation results confirm that the improved PSO algorithm significantly outperforms conventional PSO, genetic algorithms,and row-column scanning strategies in both convergence speed and fitness values,effectively avoiding local optima. These findings underscore the method's robustness, adaptability,and potential for application in large-scale antenna arrays and dynamically evolving wireless environments.
+\end{abstract}
+
+\begin{IEEEkeywords}
+  Metasurface antenna systems, particle swarm optimization, channel state information.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{M}{etasurface} antenna technology has revolutionized modern wireless communication by enabling precise beamforming through element-level phase and amplitude control, significantly enhancing communication quality and interference suppression\cite{faenzi_metasurface_2019}. However, as wireless environments grow increasingly complex and dynamic, traditional beamforming methods face limitations, particularly in large-scale scenarios where real-time acquisition of Channel State Information (CSI) is impractical. Achieving optimal interference suppression by maximizing the Signal-to-Interference-plus-Noise Ratio (SINR) has become a critical goal in such systems.
+
+Beamforming techniques have evolved from non-adaptive approaches relying on fixed beam patterns to adaptive methods robust against interference\cite{van_veen_beamforming_1988}. Non-blind adaptive techniques like Sample Matrix Inversion (SMI) and Least Mean Squares (LMS) depend on CSI for weight computation but struggle in rapidly changing channels or with limited training data\cite{ali_beamforming_2017}. Blind methods, such as Direction-of-Arrival (DoA)-based Multiple Signal Classification (MUSIC) \cite{jaafer_best_2018} and signal-property-based Constant Modulus Algorithm (CMA)\cite{zhao_semi-blind_2017}, reduce CSI reliance but often lack adaptability in complex, non-convex optimization problems. These approaches often fail to achieve robust interference suppression in dynamic environments, as their reliance on signal characteristics and susceptibility to local optima limit their ability to maximize SINR effectively, particularly in large-scale metasurface systems where scalability becomes a challenge \cite{almagboul_efficient_2019}.
+
+Metaheuristic algorithms, including Particle Swarm Optimization (PSO)\cite{huang_adaptive_2016}, Genetic Algorithm (GA)\cite{gaydos_adaptive_2019}, and Firefly Algorithm (FA)\cite{le_generalized_2024}, represent a robust alternative. These methods iteratively optimize parameters using system feedback rather than relying on CSI or explicit signal statistics. They excel in solving non-convex, high-dimensional problems, making them particularly suitable for metasurface antenna systems aiming to maximize SINR and suppress interference. However, each has limitations: PSO converges quickly but may encounter local optima, while GA and FA demonstrate strong global search capabilities but require significant computational resources and face efficiency challenges in high-dimensional spaces\cite{tang_multi-strategy_2015}\cite{hoang_firefly_2024}.
+
+This paper proposes an improved PSO algorithm for metasurface antenna systems, integrating continuous phase control and an adaptive SINR strategy to achieve efficient interference suppression. By adopting continuous rather than traditional discrete phase beamforming, the method offers enhanced adaptability to highly dynamic channel environments. Key innovations include diverse initialization using guide vector and DFT codebooks, refined velocity update strategies for rapid convergence, and a similarity-based particle reinitialization mechanism to avoid local optima. These enhancements are specifically designed to optimize beamforming performance in dynamic and complex environments.
+
+Simulations demonstrate that the proposed method significantly enhances interference suppression and system robustness, improving channel quality in dynamic environments. This approach offers a novel and effective solution for beamforming in metasurface antenna systems, paving the way for optimized wireless communication with improved SINR in complex scenarios.
+
+
+\section{Problem Solution}
+
+In a downlink metasurface antenna system, we study the transmission of signals from a base station antenna Array to a Uniform Planar Array (UPA) antenna at the receiving end. Let the number of base station antennas in the system be \(M\), and the number of UPA antenna units at the receiving end be \(N\). Since the assumed communication environment is an ideal scenario with no multipath and no shadow effect, only the Line-of-Sight (LOS) path between each base station and the receiving end is considered. In addition, neither the base station nor the receiver can obtain Channel State Information (CSI).
+
+Signal \(\mathbf{y}\) at the receiving end can be represented by the following formula:
+\begin{equation}
+  \mathbf{y} = \mathbf{H} \mathbf{g} x + \mathbf{n} \label{eq:y_signal}
+\end{equation}
+where \(\mathbf{H} \in \mathbb{C}^{N \times M}\) represents the channel matrix from the transmitting end to the receiving end, and its element \(h_{mn}\) represents the channel gain from the \(m\)-th base station to the \(n\)-th receiving antenna unit. \(\mathbf{g} \in \mathbb{C}^{M \times 1}\) is the beamforming weight vector of the base station; \(x\) is the signal emitted by the base station; \(\mathbf{n}\) represents additive Gaussian white noise at the receiving end, with a power of \(\sigma^{2}\).
+
+The element \(h_{mn}\) of channel matrix \(\mathbf{H}\) can be modeled as:
+\begin{equation}
+  h_{mn} = \beta_m e^{-j 2 \pi f \tau_m} a_m(\phi_m, \theta_m) \label{eq:h_mn}
+\end{equation}
+where \(\beta_{m}\) is the complex amplitude of the transmission path of the \(m\)-th base station, \(\tau_{m}\) represents the propagation delay from the \(m\)-th base station to the receiving end, and the calculation formula is as follows:
+\begin{equation}
+  \tau_m = \frac{\|\mathbf{b}_m - \mathbf{d}_n\|}{c} \label{eq:tau_m}
+\end{equation}
+\(\mathbf{b}_{m} = \left[ x_{m}, y_{m}, z_{m} \right]^{T}\) is the position vector of the \(m\)-th base station, and \(\mathbf{d}_{n} = \left[ x_{n}, y_{n}, z_{n} \right]^{T}\) is the position vector of the \(n\)-th array unit at the receiving end.
+
+The guiding vector \(\mathbf{a}_{m}\left( \phi_{m},\theta_{m} \right)\) of the antenna at the receiving end can be further expressed as:
+\begin{equation}
+  a_m(\phi_m, \theta_m) = \exp\left(j \frac{2 \pi}{\lambda} \mathbf{p}_m^{T} \mathbf{d}_n \right) \label{eq:guiding_vector}
+\end{equation}
+where \(\mathbf{p}_{m}\) is the spherical coordinate unit vector defined by azimuth \(\phi_{m}\) and elevation \(\theta_{m}\):
+
+\begin{equation}
+  \mathbf{p}_{m} = \begin{bmatrix}
+    \sin\left( \theta_{m} \right) \cos\left( \phi_{m} \right) \\
+    \sin\left( \theta_{m} \right) \sin\left( \phi_{m} \right) \\
+    \cos\left( \theta_{m} \right)\label{eq:p_m}
+  \end{bmatrix}
+\end{equation}
+
+Under this channel model, the Signal-to-Interference-plus-Noise Ratio (SINR) at the receiving end is defined as:
+\begin{equation}
+  \text{SINR} = \frac{\|\mathbf{h}_f^{H} \mathbf{g}\|^2}{\sum_{m \neq f} \|\mathbf{h}_m^{H} \mathbf{g}\|^2 + \sigma^2} \label{eq:SINR}
+\end{equation}
+where \(\mathbf{h}_{f}\) is the channel vector of the target base station, and \(\mathbf{h}_{m}\) is the channel vector of other interfering base stations.
+
+In order to achieve the optimal interference suppression, this paper maximizes the SINR of the target base station through beamforming optimization. In the absence of channel information, the optimization problem is expressed as follows:
+\begin{equation}
+  \begin{aligned}
+    \max_{\mathbf{g}}\  & \frac{\|\mathbf{h}_f^{H} \mathbf{g}\|^2}{\sum_{m \neq f} \|\mathbf{h}_m^{H} \mathbf{g}\|^2 + \sigma^2}, \\
+    \text{s.t. }        & \|\mathbf{g}\|_2^2 = 1
+  \end{aligned} \label{eq:optimization}
+\end{equation}
+
+In this study, \(\mathbf{g}\) represents the phase state of the array unit at the receiving end. Specifically, the phase assignment of each receiving antenna unit \(g_{n}\) is in the plural form:
+\begin{equation}
+  g_n = e^{j \phi_n}, \quad n = 1, 2, \dots, N \label{eq:phase_assignment}
+\end{equation}
+where \(\phi_{n} \in [0, 2\pi)\) is the phase of the \(n\)-th antenna unit at the receiving end. The amplitude of the shaping weight \(\|g_{n}\|\) is always equal to 1, and interference suppression is adjusted only by phase.
+
+\section{Proposed PSO Approach}
+
+The PSO algorithm, inspired by swarm intelligence, seeks the global optimum by simulating collaborative and competitive behaviors\cite{kennedy1995particle}. Each particle represents a candidate solution, with its position indicating the solution and velocity determining the search direction and magnitude. The particle positions and velocities are updated as follows:
+
+\begin{equation}
+  \begin{aligned}
+    \mathbf{v}_{i}^{(t + 1)} & = w\mathbf{v}_{i}^{(t)} + c_{1}r_{1}\left( \mathbf{p}_{i}^{\text{best~}} - \mathbf{x}_{i}^{(t)} \right) + c_{2}r_{2}\left( \mathbf{g}^{\text{best~}} - \mathbf{x}_{i}^{(t)} \right), \\
+    \mathbf{x}_{i}^{(t + 1)} & = \mathbf{x}_{i}^{(t)} + \mathbf{v}_{i}^{(t + 1)}.
+  \end{aligned}
+  \label{eq:position_velocity_update}
+\end{equation}
+
+Where \(\mathbf{x}_{i}^{(t)}\) and \(\mathbf{v}_{i}^{(t)}\) are the current position and velocity of particle \(i\) in the \(t\) generation, \(w\) is the inertia weight, controlling the influence of the
+particle\textquotesingle s current speed on the next
+generation\textquotesingle s speed, \(c_{1}\) and \(c_{2}\) are learning factors that measure the degree to which particles approach the individual optimal solution and the global optimal solution, respectively, \(r_{1}\) and \(r_{2}\) are random numbers within the interval \(\lbrack 0,1\rbrack\), used to introduce randomness and diversity, \(\mathbf{p}_{i}^{\text{best~}}\) is the historical optimal
+position of particle \(i\), \(\mathbf{g}^{\text{best~}}\) is the globally optimal position.
+
+For beamforming, particle positions correspond to the phase values of the receiving array, while velocities represent phase changes. Continuous phase control within \(\lbrack 0,2\pi)\), ensures flexibility and avoids hardware constraints. The fitness function evaluates particle quality using the signal-to-interference-plus-noise ratio (SINR), reflecting the effectiveness of phase configurations in interference suppression.
+
+However, traditional PSO struggles with local optima, limited global search, and slow convergence. To overcome these challenges, this paper introduces three key improvements:
+
+\subsection{Enhanced population
+  initialization}\label{a.-enhanced-population-initialization}
+
+The search efficiency and performance of the particle swarm algorithm highly depend on the diversity and distribution quality of the initial population. To overcome the blindness of search caused by traditional
+random initialization methods, this paper combines three methods for initialization.
+
+\subsubsection{Directional vector codebook
+  generation}\label{directional-vector-codebook-generation}
+
+The steering vector is created using predefined azimuth \((\phi)\) and elevation angles \((\theta)\) to represent the beamforming capability of the antenna array in specific directions. For a uniform planar array (UPA) with \(\N\) elements, the steering vector is:
+
+\begin{equation}
+  \mathbf{a}(\phi,\theta) = \begin{bmatrix}
+    e^{j\frac{\pi}{\lambda}\mathbf{p}^{T}\mathbf{d}_{1}} \\
+    e^{j\frac{\pi}{\lambda}\mathbf{p}^{T}\mathbf{d}_{2}} \\
+    \vdots                                               \\
+    e^{j\frac{\pi}{\lambda}\mathbf{p}^{T}\mathbf{d}_{N}}
+  \end{bmatrix}.
+  \label{eq:steering_vector}
+\end{equation}
+
+Where \(d_{n}\) represents the position vector of the \(n\)th array element, unit sphere coordinate vector defined by azimuth angle \(\phi\) and elevation angle \(\theta\) :
+
+\begin{equation}
+  \mathbf{p} = \begin{bmatrix}
+    \sin(\theta)\cos(\phi) \\
+    \sin(\theta)\sin(\phi) \\
+    \cos(\theta)
+  \end{bmatrix}.
+  \label{eq:unit_sphere_vector}
+\end{equation}
+
+In the simulation, this method generates a set of guiding vectors containing various directional beams by evenly dividing the azimuth and elevation angle ranges \(\lbrack 0,2\pi)\) and \(\lbrack 0,\pi/2)\). In future field tests, the different angles for generating guiding vectors may be further adjusted for specific channel environments.
+
+The steering vector codebook leverages the antenna array's geometric characteristics to provide a physically meaningful initial solution. It generates array phase states that optimally respond to incident waves under ideal conditions, without considering interference.
+
+\subsubsection{Discrete Fourier Transform codebook generation}\label{discrete-fourier-transform-codebook-generation}
+
+
+Assuming the receiving end array is a Uniform Planar Array (UPA), with \(N_{y}\) rows and columns
+of \(N_{z}\), then the total number of array elements is \(N = N_{y} \cdot N_{z}\). First, generate the DFT matrices of \(N_{y} \times N_{y}\) and \(N_{z} \times N_{z}\) for each dimension\textquotesingle s rows and columns, where the elements of the matrix are defined by the following formula:
+
+\begin{equation}
+  F_{y}(k, n) = e^{-j\frac{2\pi}{N_{y}}kn}, \quad F_{z}(k, n) = e^{-j\frac{2\pi}{N_{z}}kn}.
+  \label{eq:dft_elements}
+\end{equation}
+
+The index corresponding to \(k,n = 0,1,\ldots,N_{y} - 1\) is \(F_{y}\), and the index corresponding to \(k,n = 0,1,\ldots,N_{z} - 1\) is \(F_{z}\). The row vectors and column vectors of these two matrices
+represent the phase change patterns along the row and column directions, respectively. Next, the phase matrix of \(N \times N\) is generated by performing the Kronecker Product on these two matrices:
+
+\begin{equation}
+  F_{\text{DFT}} = F_{y} \otimes F_{z}.
+  \label{eq:kronecker_product}
+\end{equation}
+
+Its elements are:
+
+\begin{equation}
+  F_{\text{DFT}}(i,j) = F_{y}(k_{1},n_{1}) \cdot F_{z}(k_{2},n_{2}),
+  \label{eq:kronecker_elements}
+\end{equation}
+
+Where \(i = k_{1} \cdot N_{z} + k_{2},\ j = n_{1} \cdot N_{z} + n_{2}\)represents the index correspondence of row and column elements in the two-dimensional planar array. By extracting each column of \({\bar{F}}_{\text{DFT~}}\) as the initial position of the particles, a complete DFT codebook can be constructed.
+
+
+DFT codebook generates a unique phase configuration for each antenna element based on the geometric characteristics of the antenna array and the principles of Fourier transform, providing a uniform phase distribution across the entire array space. Combining two kinds of codebooks integrates complementary physical and mathematical characteristics, improving the effectiveness of population initialization.
+
+\subsubsection{Random generation}\label{random-generation}
+
+To avoid the limitations of the search space caused by excessive reliance on prior knowledge, this paper retains the method of randomly generating some initial positions of particles. The range for randomly generating particle positions is:
+
+\begin{equation}
+  \phi_{n} = 2\pi \cdot \text{rand}(0,1), \quad n=1,2,\ldots,N.
+  \label{eq:random_initialization}
+\end{equation}
+
+By combining guided vector codebooks, DFT codebooks, and random generation, this approach balances high-quality solutions with sufficient diversity,  significantly enhances population quality in early search stages and accelerates global convergence.
+
+\subsection{Speed Update Formula and Dynamic Adjustment
+  Strategy}\label{b.-speed-update-formula-and-dynamic-adjustment-strategy}
+
+Inertia weight and learning factors are key parameters that control the search behavior in particle swarm optimization. The traditional fixed value setting method shows inadequacies in complex problems. To enhance the adaptability of PSO at different stages, this paper proposes a method to dynamically adjust the weight of inertia and learning factors.
+
+\subsubsection{Dynamic adjustment of inertia
+  weight}\label{dynamic-adjustment-of-inertia-weight}
+
+Inertia weight \(w\) controls the influence of the current speed of the particle on the speed of the next generation. A larger inertia weight is suitable for global search, while a smaller inertia weight helps with local development. To balance both, this paper adopts the following dynamic adjustment strategy, where the initial inertia weight is determined by similarity, allowing particles to make finer displacements near the global best position, while being more inclined to move in the direction of inertia when deviating further away.
+
+\begin{equation}
+  w_{i} = w_{\text{max}} - s_{i} \cdot (w_{\text{max}} - w_{\text{min}})
+  \label{eq:inertia_weight_similarity}
+\end{equation}
+
+Then further adjust through the hyperbolic tangent function to fit the different stages of the search process:
+
+\begin{equation}
+  w_{i} = w_{\text{min}} + (w_{i} - w_{\text{min}}) \cdot \tanh\left(-1.25 + 2\cdot\frac{K-t}{K}\right),
+  \label{eq:inertia_weight_dynamic}
+\end{equation}
+
+Where \(w_{\max}\) and \(w_{\min}\) are the maximum and minimum values of the inertia weight, respectively, \(K\) is the total number of iterations, \(t\) is the current number of iterations.
+
+In the early stage of the search, the characteristics of the hyperbolic tangent curve cause the inertia weight to decrease slowly, giving particles enough time for extensive global search; in the mid-stage of
+the search, the weight decreases approximately linearly, gradually strengthening local search; in the late stage of the search, the weight change slows down, helping to accurately determine the optimal solution.
+
+\subsubsection{Dynamic adjustment of learning
+  factors}\label{dynamic-adjustment-of-learning-factors}
+
+The learning factors \(c_{1}\) and \(c_{2}\) control the degree of dependence of particles on the individual optimal solution and the lobal optimal solution. To achieve a phased balance, this paper adopts the following adjustment strategy:
+
+\begin{equation}
+  \begin{aligned}
+    c_{1}^{(t)} & = c_{1,\text{max}} - \frac{c_{1,\text{max}} - c_{1,\text{min}}}{T} \cdot t, \\
+    c_{2}^{(t)} & = c_{2,\text{min}} + \frac{c_{2,\text{max}} - c_{2,\text{min}}}{T} \cdot t.
+  \end{aligned}
+  \label{eq:learning_factors_dynamic}
+\end{equation}
+
+In the initial stage \(c_{1} > c_{2}\), particles focus more on individual experiences to maintain population diversity; in the later stage \(c_{2} > c_{1}\), global convergence ability is enhanced.
+
+\subsubsection{Improved speed update
+  formula}\label{improved-speed-update-formula}
+
+Based on the above improvements, the speed update formula is as follows:
+
+\begin{equation}
+  v_{i}^{(t+1)} = w^{(t)}v_{i}^{(t)} + c_{1}^{(t)}r_{1}(p_{i}^{\text{best}} - x_{i}^{(t)}) + c_{2}^{(t)}r_{2}(g^{\text{best}} - x_{i}^{(t)}).
+  \label{eq:speed_update_formula}
+\end{equation}
+
+\subsection{Similarity-based Particle Reinitialization
+  Mechanism}\label{c -similarity-based-particle-reinitialization-mechanism}
+
+In order to prevent the particle swarm from falling into local optimal solutions, this paper designs a similarity-based reinitialization mechanism that dynamically adjusts particle distribution by detecting
+population diversity and particle similarity.
+
+\subsubsection{Similarity calculation}\label{similarity-calculation}
+
+The similarity of particle \(i\) is defined as its Euclidean distance to
+the current global optimal position \(g^{\text{best~}}\) :
+
+\begin{equation}
+  \text{Sim}_{i} = \begin{cases}
+    1,                                                                  & \text{if } d_{i} < d_{\text{min}},                        \\
+    1 - \frac{d_{i} - d_{\text{min}}}{d_{\text{max}} - d_{\text{min}}}, & \text{if } d_{\text{min}} \leq d_{i} \leq d_{\text{max}}, \\
+    0,                                                                  & \text{if } d_{i} > d_{\text{max}},
+  \end{cases}
+  \label{eq:similarity}
+\end{equation}
+
+Where \(d_{i} = \left. \parallel x_{i} - g^{\text{best~}} \right.\parallel,d_{\min}\) and \(d_{\max}\) are the minimum and maximum distance thresholds, respectively. According to the definition of the above similarity concept, the closer two particles are, the more similar they are, and thus the greater the similarity. Therefore, the concept of similarity can measure the degree of similarity between two particles.
+
+\subsubsection{Diversity calculation}\label{diversity-calculation}
+
+The diversity of the population is assessed by calculating the similarity of all particles, using the concept of aggregation degree \(C\) to describe the spatial distribution of each particle in the
+population:
+
+\begin{equation}
+  C = \frac{1}{n} \sum_{i=1}^{n} \text{Sim}_{i}.
+  \label{eq:aggregation_degree}
+\end{equation}
+
+Here, \(n\) is the total number of particles, and \(t\) is the current iteration count. The lower the degree of aggregation, the more dispersed the positions of the particles in the population, and the search process covers a broader solution space; conversely, a higher degree of aggregation indicates that most particles are clustered in a certain local area of the solution space, possibly trapped in a local optimum.
+
+\subsubsection{Reinitialize probability}\label{reinitialize-probability}
+
+The re-initialization probability is defined based on particle similarity and population diversity:
+
+\begin{equation}
+  P_{i} = \lambda \cdot \text{Sim}_{i} \cdot C,
+  \label{eq:reinitialization_probability}
+\end{equation}
+
+Among them, \(\lambda = \lambda_{\max}\left( 1 - \frac{t}{T} \right)\) is a parameter that decreases with the number of iterations, and \(C\) is the aggregation degree of the current population.
+
+\subsubsection{Reinitialize operation}\label{reinitialize-operation}
+
+For particles that meet the reinitialization conditions, their position and velocity are randomized again, with the position being:
+\begin{equation}
+  \phi_{n} = 2\pi \cdot rand(0,1),n = 1,2,\ldots,N
+  \label{eq:reinitialize_position}
+\end{equation}
+This update ensures the complete randomization of particle positions, helping particles escape possible local optimum areas.
+
+\subsection{Algorithms}\label{d.-algorithms}
+
+Through improvements in these three aspects, the PSO algorithm proposed in this paper can more effectively balance global search and local development, achieving robust interference suppression optimization for complex channel environments. The pseudocode of the algorithm is described in Algorithm 1.
+
+\begin{algorithm}
+  \caption{Improved PSO Algorithm}
+  \begin{algorithmic}[1]
+    \STATE \textbf{Input:} Set $n$ as the number of particles, $K$ as the maximum iterations, $N$ as the problem dimension, $v_{\text{max}}$ as the maximum particle velocity, $w_{\text{max}}, w_{\text{min}}$ as inertia weights, $c_{\text{max}}, c_{\text{min}}$ as learning factors, $\lambda, \lambda_{\text{max}}$ as mutation constants, and $(d_{\text{min}}, d_{\text{max}}, \delta)$ for similarity.
+    \STATE \textbf{Initialize} particle positions $x(i,j)$ randomly in $[0, 2\pi]$, and velocities $v(i,j)$ randomly in $[-v_{\text{max}}, v_{\text{max}}]$.
+    \STATE Compute initial fitness for all particles and initialize $p_{\text{best}}, g_{\text{best}}$.
+    \STATE For each particle $i$, calculate the initial distance $d_2(i,1)$ to $g_{\text{best}}$ and similarity $s_2(i,1)$.
+    \FOR{$t = 1$ to $K$}
+    \STATE Update mutation constant $\lambda = \lambda_{\text{max}} \cdot (1 - t/K)$.
+    \STATE Calculate learning rates $u_1, u_2$ based on iteration progress.
+    \FOR{each particle $i = 1$ to $n$}
+    \STATE Update inertia weight:
+    \[
+      w(i) =
+      \begin{aligned}[t]
+         & s_2(i, t) \cdot \frac{(w_{\text{max}} + w_{\text{min}})}{2} \\
+         & + \tanh\left(-1.25 + 2.5 \frac{(K - t)}{K}\right)           \\
+         & \cdot \frac{(w_{\text{max}} - w_{\text{min}})}{2}.
+      \end{aligned}
+    \]
+    \FOR{each dimension $j = 1$ to $N$}
+    \STATE Compute relative displacement $p(i,j)$ and $g(i,j)$ based on $p_{\text{best}}$ and $g_{\text{best}}$.
+    \STATE Update velocity:
+    \[
+      v(i,j) =
+      \begin{aligned}[t]
+         & w(i) \cdot v(i,j) + u_1 \cdot \text{rand()} \cdot p(i,j) \\
+         & + u_2 \cdot \text{rand()} \cdot g(i,j).
+      \end{aligned}
+    \]
+    \STATE Limit velocity using nonlinear mapping:
+    \[
+      v(i,j) = \tanh(v(i,j)) \cdot v_{\text{max}}.
+    \]
+    \STATE Update position:
+    \[
+      x(i,j) = x(i,j) + v(i,j).
+    \]
+    \IF{$x(i,j) < 0$}
+    \STATE $x(i,j) = x(i,j) + 2\pi$.
+    \ELSIF{$x(i,j) \geq 2\pi$}
+    \STATE $x(i,j) = x(i,j) - 2\pi$.
+    \ENDIF
+    \ENDFOR
+    \ENDFOR
+    \STATE Compute new fitness for all particles. Update $p_{\text{best}}$ and $g_{\text{best}}$ based on fitness values.
+    \STATE Recalculate distance $d_2(i,t+1)$ and similarity $s_2(i,t+1)$.
+    \STATE Reinitialize particles probabilistically using $\lambda \cdot \text{CCC2}(t) \cdot s_2(i,t+1)$.
+    \ENDFOR
+    \STATE \textbf{Return:} $g_{\text{best}}$ as the best solution and the corresponding fitness.
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Results and Discussion}
+
+To verify the application effect of the improved Particle Swarm Optimization (PSO) algorithm proposed in this paper in the metasurface antenna system, multiple simulation experiments were conducted. Six
+different algorithms were used in the simulation, including basic PSO (discrete PSO and continuous PSO), improved PSO (initialization improved PSO, initialization + velocity parameter improved PSO), genetic algorithm (GA), and row-column scanning algorithm. The simulation parameters and their values are shown in Table 1, and two scenarios were set during the simulation with iteration counts of 100 and 1000.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=2.5in]{图片1}
+  \caption{Simulation results for 100 times.}
+  \label{fig_1}
+\end{figure}
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=2.5in]{图片2}
+  \caption{Simulation results for 1000 times.}
+  \label{fig_1}
+\end{figure}
+
+\begin{table}[!t]
+  \caption{Simulation Parameters and Default Values\label{tab:table1}}
+  \centering
+  \begin{tabular}{|c||c|}
+    \hline
+    \textbf{Parameter}                   & \textbf{Default Value}       \\
+    \hline
+    Speed of Light                       & $3 \times 10^8$ m/s          \\
+    \hline
+    Signal Frequency                     & $2.6 \times 10^9$ Hz         \\
+    \hline
+    Signal Wavelength                    & 0.1154 m                     \\
+    \hline
+    Number of Rows in Array Antenna      & 5                            \\
+    \hline
+    Number of Columns in Array Antenna   & 5                            \\
+    \hline
+    Total Elements in Array              & 25                           \\
+    \hline
+    Element Spacing                      & 0.0577 m                     \\
+    \hline
+    Noise Level                          & 20 dBm                       \\
+    \hline
+    Base Station Gain Coefficients       & (1.0, 1.0, 1.0, 1.0, 0.1)    \\
+    \hline
+    Number of Interfering Base Stations  & 4                            \\
+    \hline
+    Main Base Station Coordinates        & (0, 0, 100)                  \\
+    \hline
+    Interfering Base Station Coordinates & \((-50\sqrt{3}, -150, 100)\) \\
+                                         & \((50\sqrt{3}, -150, 30)\)   \\
+                                         & \((150, 0, 50)\)             \\
+                                         & \((-150, 0, 200)\)           \\
+    \hline
+    Number of Particles                  & 50                           \\
+    \hline
+    Number of Averaging Iterations       & 20                           \\
+    \hline
+    Generations per Iteration            & 100 / 1000                   \\
+    \hline
+    Maximum Particle Velocity            & $\pi / 6$                    \\
+    \hline
+    Initial Inertia Weight               & 0.8                          \\
+    \hline
+    Maximum Inertia Weight               & 0.8                          \\
+    \hline
+    Minimum Inertia Weight               & 0.1                          \\
+    \hline
+    Individual Learning Factor           & 1.2                          \\
+    \hline
+    Social Learning Factor               & 1.2                          \\
+    \hline
+  \end{tabular}
+\end{table}
+
+
+
+As shown in Figures 5 and 6, the fitness function trends of each algorithm differ with increasing iterations. Initially, the row-column scanning algorithm converges faster, reaching stability quickly but often falling into local optima. The improved PSO algorithm, especially the "initialization + speed parameter improved PSO," achieves a better balance between global search and local exploitation. It quickly finds high-quality solutions and, by adjusting the speed parameter, maintains strong exploration ability in later stages, avoiding local optima. The genetic algorithm also converges fast initially, but its convergence slows down as population diversity decreases. Continuous PSO and discrete PSO show slower convergence, with discrete PSO reaching a lower final fitness value.
+
+The improved PSO algorithm (Initialization + Speed Parameter Improved PSO) achieves the highest fitness values of 30.1714 (Fig. 5) and 30.6439 (Fig. 6), indicating superior performance in exploring the solution space. PSO with initialization speed also performs well with fitness values of 28.0467 and 28.7438 (Fig. 6), but still falls short compared to the improved PSO. The row-column scanning algorithm shows fitness values of 23.3442 (Fig. 5) and 23.3813 (Fig. 6), which are better than continuous and discrete PSO, but significantly lower than the improved PSO. Continuous PSO and discrete PSO have fitness values of 18.873 and 14.5817 (Fig. 5) and 21.75 and 16.8206 (Fig. 6), respectively, indicating limited ability to find optimal solutions.
+
+At 100 iterations, the improved PSO quickly finds high-quality solutions and improves adaptation in later stages by optimizing the speed parameter. At 1000 iterations, the improved PSO shows a clear balance between global and local search, with the fitness rising rapidly to 30.6439, demonstrating excellent performance. In contrast, other algorithms, especially the row-column scanning algorithm, stabilize too early due to insufficient global search capability.
+
+The simulation results demonstrate that the improved PSO algorithm significantly outperforms traditional PSO, genetic algorithms, and row-column scanning algorithms in beam assignment and interference suppression. By enhancing initialization and speed parameters, it balances global search and local exploitation, achieving fast convergence and avoiding local optima. This makes it highly effective in dynamic wireless environments, particularly for large-scale antenna arrays, where it consistently finds high-quality solutions and optimizes the solution space.
+
+\section{Conclusion}
+This paper proposes an improved Particle Swarm Optimization (PSO) algorithm that effectively addresses the challenges of beamforming and interference suppression in metasurface antenna systems, particularly under conditions lacking channel state information. By enhancing population initialization, velocity updating, and particle reinitialization mechanisms, the algorithm achieves a favorable balance between global exploration and local exploitation, significantly improving convergence speed and fitness values. Simulation results demonstrate that the improved PSO algorithm outperforms traditional PSO, genetic algorithms, and the row-column scanning algorithm in terms of convergence speed, fitness, and avoiding local optima. This method exhibits strong adaptability and robustness, making it suitable for dynamic and complex wireless environments, and provides an effective technical solution for the optimal design of metasurface antenna systems.
+
+
+\bibliographystyle{ieeetr}
+\bibliography{letter}
+
+
+\vfill
+
+\end{document}
+
+
